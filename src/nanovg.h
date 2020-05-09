@@ -272,6 +272,10 @@ void nvgLineJoin(NVGcontext* ctx, int join);
 // Already transparent paths will get proportionally more transparent as well.
 void nvgGlobalAlpha(NVGcontext* ctx, float alpha);
 
+// Sets the depth buffer value for future draw operations.
+// In the range of [0 - 1], defaults to 0, smaller depths show up on top of larger depths.
+void nvgDepth(NVGcontext* ctx, float depth);
+
 //
 // Transforms
 //
@@ -639,7 +643,7 @@ struct NVGscissor {
 typedef struct NVGscissor NVGscissor;
 
 struct NVGvertex {
-	float x,y,u,v;
+    float x, y, u, v, d;
 };
 typedef struct NVGvertex NVGvertex;
 

@@ -465,6 +465,7 @@ static int glnvg__createShader(GLNVGshader* shader, const char* name, const char
 
 	glBindAttribLocation(prog, 0, "vertex");
 	glBindAttribLocation(prog, 1, "tcoord");
+    glBindAttribLocation(prog, 2, "depth");
 
 	glLinkProgram(prog);
 	glGetProgramiv(prog, GL_LINK_STATUS, &status);
@@ -537,19 +538,21 @@ static int glnvg__renderCreate(void* uptr)
 		"	uniform vec2 viewSize;\n"
 		"	in vec2 vertex;\n"
 		"	in vec2 tcoord;\n"
+        "   in float depth;\n"
 		"	out vec2 ftcoord;\n"
 		"	out vec2 fpos;\n"
 		"#else\n"
 		"	uniform vec2 viewSize;\n"
 		"	attribute vec2 vertex;\n"
 		"	attribute vec2 tcoord;\n"
+        "   attribute float depth;\n"
 		"	varying vec2 ftcoord;\n"
 		"	varying vec2 fpos;\n"
 		"#endif\n"
 		"void main(void) {\n"
 		"	ftcoord = tcoord;\n"
 		"	fpos = vertex;\n"
-		"	gl_Position = vec4(2.0*vertex.x/viewSize.x - 1.0, 1.0 - 2.0*vertex.y/viewSize.y, 0, 1);\n"
+		"	gl_Position = vec4(2.0*vertex.x/viewSize.x - 1.0, 1.0 - 2.0*vertex.y/viewSize.y, depth, 1);\n"
 		"}\n";
 
 	static const char* fillFragShader =
@@ -650,7 +653,10 @@ static int glnvg__renderCreate(void* uptr)
 		"#else\n"
 		"		vec4 color = texture2D(tex, pt);\n"
 		"#endif\n"
-		"		if (texType == 1) color = vec4(color.xyz*color.w,color.w);"
+		"		if (texType == 1) {\n"
+        "           color = vec4(color.xyz*color.w,color.w);\n"
+        "           if (color.w < 0.5) discard;\n"
+        "       }\n"
 		"		if (texType == 2) color = vec4(color.x);"
 		"		// Apply color tint and alpha.\n"
 		"		color *= innerCol;\n"
@@ -1190,7 +1196,8 @@ static void glnvg__renderFlush(void* uptr)
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
 		glEnable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
 		glDisable(GL_SCISSOR_TEST);
 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 		glStencilMask(0xffffffff);
@@ -1224,8 +1231,10 @@ static void glnvg__renderFlush(void* uptr)
 		glBufferData(GL_ARRAY_BUFFER, gl->nverts * sizeof(NVGvertex), gl->verts, GL_STREAM_DRAW);
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(2);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(NVGvertex), (const GLvoid*)(size_t)0);
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(NVGvertex), (const GLvoid*)(0 + 2*sizeof(float)));
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(NVGvertex), (const GLvoid*)(0 + 4*sizeof(float)));
 
 		// Set view and texture just once per frame.
 		glUniform1i(gl->shader.loc[GLNVG_LOC_TEX], 0);
@@ -1250,6 +1259,7 @@ static void glnvg__renderFlush(void* uptr)
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(2);
 #if defined NANOVG_GL3
 		glBindVertexArray(0);
 #endif
